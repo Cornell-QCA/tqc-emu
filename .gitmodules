@@ -1,0 +1,3 @@
+[submodule "qiskit-parser"]
+	path = qiskit-parser
+	url = git@github.com:TrappedIonsCornell/qiskit-parser.git
