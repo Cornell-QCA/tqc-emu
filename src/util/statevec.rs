@@ -1,47 +1,65 @@
+use nalgebra::{base::DVector, DMatrix};
+use numpy::{PyArray1, PyReadonlyArray1, ToPyArray};
+use crate::util::math::c64;
 use pyo3::prelude::*;
-use numpy::ndarray::Array1;
-use numpy::{Complex64, PyArray1, PyReadonlyArray1, ToPyArray};
 
 #[pyclass]
 #[derive(Clone, Debug, PartialEq)]
 /// State Vector for the system
 pub struct StateVec {
-    vec: Array1<Complex64>,
+    vec: DVector<c64>,
     #[pyo3(get)]
     init_size: usize,
 }
 
+/// Internal Methods
 impl StateVec {
-    /// Get a clone of the state vector without the size
-    pub fn get_vec(&self) -> Array1<Complex64> {
+    /// Returns a clone of the state vector
+    pub fn get_vec(&self) -> DVector<c64> {
         self.vec.clone()
     }
-    /// Sets the norm of the state vector to 1 in place
+
+    pub fn apply_op(&mut self, op: DMatrix<c64>) {
+        self.vec = op * self.vec.clone();
+    }
+
+    /// Modifies the norm of the state vector to 1
     pub fn normalize(&mut self) {
         let norm = self.vec.iter().map(|x| x.norm_sqr()).sum::<f64>().sqrt();
         for i in 0..self.vec.len() {
-            // Since the norm has no imaginary component, we divide only the real component
-            self.vec[i] /= Complex64::new(norm, 0.0);
+            self.vec[i] /= c64::new(norm, 0.0);
         }
     }
 }
 
+/// Python Methods
 #[pymethods]
 impl StateVec {
     #[new]
     /// Creates a new state vector. If no vector is provided, it will be
     /// initialized to |0> for all qubits. Additionally, the vector will be
     /// normalized.
-    pub fn new(qubit_num: usize, vec: Option<PyReadonlyArray1<Complex64>>) -> Self {
-        // init_size is required to create the StateVec
+    pub fn new(qubit_num: usize, vec: Option<PyReadonlyArray1<c64>>) -> Self {
         let init_size = 2 << (qubit_num - 1);
         let vec = match vec {
-            Some(vec) => vec.as_array().to_owned(),
-            None => {
-                let mut vec = vec![Complex64::new(1.0, 0.0)];
-                vec.extend(vec![Complex64::new(0.0, 0.0); init_size - 1]);
-                Array1::from(vec)
+            Some(vec) => {
+                let vec = vec.as_array().to_owned();
+                let mut state_vec = DVector::zeros(init_size);
+                for (i, val) in vec.iter().enumerate() {
+                    state_vec[i] = *val;
+                }
+                state_vec
             }
+            None => DVector::from_iterator(
+                init_size,
+                (0..init_size).map(|x| {
+                    if x % 2 == 0 {
+                        c64::new(1.0, 0.0)
+                    } else {
+                        c64::new(0.0, 0.0)
+                    }
+                }),
+            ),
         };
 
         // normalize the vector
@@ -51,30 +69,31 @@ impl StateVec {
     }
 
     #[getter]
-    pub fn vec(&self, py: Python<'_>) -> PyResult<Py<PyArray1<Complex64>>>{
-        Ok(self.vec.to_pyarray_bound(py).to_owned().into())
+    fn vec(&self, py: Python<'_>) -> PyResult<Py<PyArray1<c64>>> {
+        let vec = self.vec.iter().map(|x| *x).collect::<Vec<c64>>();
+        Ok(vec.to_pyarray(py).to_owned())
     }
 
     #[setter]
-    pub fn set_vec(&mut self, vec: PyReadonlyArray1<Complex64>) {
-        self.vec = vec.as_array().to_owned();
+    fn set_vec(&mut self, vec: PyReadonlyArray1<c64>) {
+        let vec = vec.as_array().to_owned();
+        for (i, val) in vec.iter().enumerate() {
+            self.vec[i] = *val;
+        }
     }
 
     #[setter]
-    /// Sets size of state vector and sets all components to 0
     pub fn set_size(&mut self, qubit_num: usize) {
         self.init_size = 2 << qubit_num;
-        self.vec = Array1::zeros(self.init_size);
+        self.vec = DVector::zeros(self.init_size);
     }
 
-    /// Returns vector of all complex components
-    // parentheses are used to denote a column vector
     pub fn __str__(&self) -> PyResult<String> {
-        let mut output: String = "(\n".to_string();
+        let mut output: String = "[\n".to_string();
         for val in self.vec.iter() {
             output.push_str(&format!("\t{:?} + {:?}i\n", val.re, val.im));
         }
-        output.push_str(")");
+        output.push_str("]");
         Ok(output)
     }
 }
