@@ -1,8 +1,6 @@
-mod anyon;
 mod braiding;
 mod fusion;
 mod gates;
-mod state;
 mod util;
 use pyo3::prelude::*;
 
@@ -11,20 +9,16 @@ use pyo3::prelude::*;
 /// here following the same format
 #[pymodule]
 fn tqc_emu(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // m.add_class::<model::anyon::Anyon>()?;
-    // m.add_class::<model::anyon::IsingTopoCharge>()?;
-    // m.add_class::<model::anyon::FibonacciTopoCharge>()?;
-    // m.add_class::<model::anyon::TopoCharge>()?;
+    m.add_class::<util::anyon::Anyon>()?;
+    m.add_class::<util::anyon::TopoCharge>()?;
+    m.add_class::<util::basis::Basis>()?;
+    m.add_class::<util::state::StateVec>()?;
+    m.add_class::<util::state::State>()?;
 
-    // m.add_class::<model::model::Model>()?;
-    // m.add_class::<model::model::AnyonModel>()?;
+    m.add_class::<fusion::fusion::Fusion>()?;
+    m.add_class::<fusion::fusion::FusionPair>()?;
 
-    // m.add_class::<fusion::fusion::Fusion>()?;
-    // m.add_class::<fusion::fusion::FusionPair>()?;
+    m.add_class::<braiding::braiding::Braid>()?;
 
-    // m.add_class::<fusion::state::State>()?;
-
-    // m.add_class::<util::basis::Basis>()?;
-    // m.add_class::<util::statevec::StateVec>()?;
     Ok(())
 }

@@ -2,12 +2,12 @@ use crate::util::math::c64;
 use nalgebra::DMatrix;
 use pyo3::prelude::*;
 
-use crate::state::State;
+use crate::util::state::State;
 
 /// A braid is a sequence of swaps that can be applied to a state. A sequence of
 /// braids is analogous to a gate in a quantum circuit for TQC.
 #[pyclass]
-struct Braid {
+pub struct Braid {
     #[pyo3(get)]
     state: State,
     #[pyo3(get)]
@@ -18,7 +18,7 @@ struct Braid {
 impl Braid {
     // TODO: Write swap
 
-    //  TODO: Write swap_to_qubit
+    // TODO: Write swap_to_qubit
 
     // TODO: Write swap_mtx
 

@@ -1,9 +1,7 @@
 use std::collections::HashMap;
-
 use pyo3::prelude::*;
-
-use crate::anyon::TopoCharge;
-use crate::state::State;
+use crate::util::anyon::TopoCharge;
+use crate::util::state::State;
 
 /// We represent an anyon's topological charge as a triple of usizes. The values
 /// serve as the combinatoric labels for the various states.

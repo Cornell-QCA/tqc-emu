@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use std::collections::HashSet;
-use crate::state::FusionNode;
+
+use super::state::FusionNode;
 
 #[pyclass]
 #[derive(Clone, Debug, PartialEq)]
