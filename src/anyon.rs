@@ -12,6 +12,10 @@ pub enum TopoCharge {
 
 #[pymethods]
 impl TopoCharge {
+    pub fn value(&self) -> usize {
+        *self as usize
+    }
+
     pub fn to_string(&self) -> String {
         match self {
             TopoCharge::Psi => "Psi".to_string(),
