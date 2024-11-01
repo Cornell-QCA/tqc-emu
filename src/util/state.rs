@@ -62,6 +62,15 @@ impl State {
     pub fn fusion_ops(&self) -> Vec<FusionNode> {
         self.fusion_ops.clone()
     }
+
+    pub fn swap_anyons(&mut self, index_a: usize, index_b: usize) {
+        if index_a >= self.anyons.len() || index_b >= self.anyons.len() {
+            return Err("Swap index out of bounds");
+        }
+
+        self.anyons.swap(index_a, index_b);   
+        Ok(())
+    }
 }
 
 #[pymethods]
