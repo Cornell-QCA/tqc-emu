@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use std::collections::HashSet;
 
 use crate::util::state::State;
+use crate::error::Error;
 
 /// A braid is a sequence of swaps that can be applied to a state. A sequence of
 /// braids is analogous to a gate in a quantum circuit for TQC.
@@ -17,25 +18,26 @@ pub struct Braid {
 }
 
 impl Braid {
-    pub fn swap(&mut self, swaps: Vec<(usize, usize)>) -> Result<(), String> {
+    /// Swaps the position of anyons in `state.anyons` for each specified swap in `swaps`.
+    /// Swaps can only be performed on adjacent anyons, and each anyon can only be swapped once per `swap` call.
+    pub fn swap(&mut self, swaps: Vec<(usize, usize)>) -> Result<(), Error> {
         let mut applied_swaps: Vec<(usize, usize)> = Vec::new();
         let mut swapped_indices = HashSet::new();
 
         for (index_a, index_b) in swaps {
-
             if (index_a as isize - index_b as isize).abs() != 1 {
-                return Err(format!("Indices {} and {} are not adjacent", index_a, index_b));
+                return Error::BraidingError(format!("Indices {} and {} are not adjacent", index_a, index_b));
             }
 
             if swapped_indices.contains(&index_a) {
-                return Err(format!("Index {} has already been swapped in this operation", index_a));
+                return Error::BraidingError(format!("Index {} has already been swapped in this operation", index_a));
             }
 
             if swapped_indices.contains(&index_b) {
-                return Err(format!("Index {} has already been swapped in this operation", index_b));
+                return Error::BraidingError(format!("Index {} has already been swapped in this operation", index_b));
             }
 
-            self.state.swap_anyons(index_a, index_b).map_err(|e| e.to_string())?;
+            self.state.swap_anyons(index_a, index_b).map_err(|e| Error::BraidingError(format!("Failed to swap anyons: {}", e)));
 
             applied_swaps.push((index_a, index_b));
             swapped_indices.insert(index_a);
