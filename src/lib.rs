@@ -2,6 +2,7 @@ mod braiding;
 mod fusion;
 mod gates;
 mod util;
+mod error;
 use pyo3::prelude::*;
 
 /// This builds the bindings for maturin and enables the python module to be
