@@ -1,5 +1,5 @@
 use crate::fusion::fusion::Fusion;
-use crate::util::math::c64;
+use crate::util::math::{self, c64};
 use nalgebra::DMatrix;
 use pyo3::prelude::*;
 use std::collections::HashSet;
@@ -52,15 +52,7 @@ impl Braid {
 
     /// Determines which qubit a specified swap operation is acting on.
     pub fn swap_to_qubit(&self, time: usize, swap_index: usize) -> Result<Option<usize>, Error> {
-        if time == 0 || time > self.swaps.len() {
-            return Error::BraidingError(
-                format!(
-                    "Time cannot be 0 or greater than the length of the swaps. Inputted time: {}, swaps length: {}",
-                    time, 
-                    self.swaps.len()
-                )
-            );
-        }
+        self.is_valid_time(time)?;
 
         let swap = &self.swaps[time - 1];
         if swap_index >= swap.len() {
@@ -86,10 +78,43 @@ impl Braid {
     }
 
     // TODO: Write swap_mtx
+    pub fn generate_swap_matrix(self, time: usize, swap_index: usize) {
+        self.is_valid_time(time)?;
 
-    // TODO: Write unitary
+    }
+
+    pub fn generate_unitary(&self, time: usize, swap_index: usize) -> Result<DMatrix<c64>, Error> {
+        let qubit_encoding: Vec<FusionPair> = self.fusion.qubit_enc();
+
+        let num_qubits = qubit_encoding.len();
+        let unitary = DMatrix::<c64>::identity(num_qubits, num_qubits);
+
+        let swap_qubit_index = self.swap_to_qubit(time, swap_index);
+        for i in 0..num_qubits {
+            if i == swap_qubit_index {
+                swap_matrix = self.generate_swap_matrix(time, swap_index);
+                unitary = math::kronecker(unitary, swap_matrix);
+            } else {
+                unitary = math::kronecker(unitary, DMatrix::<c64>::identity(2, 2));
+            }
+        }
+
+        Ok(unitary)
+    }
 
     // TODO: Write str
+    fn is_valid_time(&self, time: usize) -> Result<(), Error> {
+        if time == 0 || time > self.swaps.len() {
+            return Error::BraidingError(
+                format!(
+                    "Time cannot be 0 or greater than the length of the swaps. Inputted time: {}, swaps length: {}",
+                    time, 
+                    self.swaps.len()
+                )
+            );
+        }
+        Ok(())
+    }
 }
 
 #[pymethods]
