@@ -67,7 +67,7 @@ impl State {
 #[pymethods]
 impl State {
     #[new]
-    fn new() -> Self {
+    pub fn new() -> Self {
         State {
             anyons: Vec::new(),
             fusion_ops: Vec::new(),
@@ -76,7 +76,7 @@ impl State {
     }
 
     /// Add an anyon to the state
-    fn add_anyon(&mut self, anyon: Anyon) -> PyResult<bool> {
+    pub fn add_anyon(&mut self, anyon: Anyon) -> PyResult<bool> {
         self.anyons.push(anyon);
         Ok(true)
     }

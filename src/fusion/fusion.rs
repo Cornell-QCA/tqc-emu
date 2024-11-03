@@ -269,3 +269,32 @@ impl Fusion {
         Ok(self.possible_sigmas(qubits))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::state::State;
+
+    #[test]
+    fn test_fusion_pair() {
+        let pair1: FusionPair = FusionPair { anyon_1: 1, anyon_2: 2};
+        assert_eq!(pair1.anyon_1(), 1);
+        assert_eq!(pair1.anyon_2(), 2);
+    }
+
+    #[test]
+    fn test_canonical_tc() {
+        let example_fusion: Fusion = Fusion::new(State::new());
+        let canonical_psi: CanonicalTC = [1,0,0];
+        let canonical_vacuum: CanonicalTC = [0,1,0];
+        let canonical_sigma: CanonicalTC = [0,0,1];
+        assert_eq!(canonical_psi, example_fusion.canonical_tc(TopoCharge::Psi));
+        assert_eq!(canonical_vacuum, example_fusion.canonical_tc(TopoCharge::Vacuum));
+        assert_eq!(canonical_sigma, example_fusion.canonical_tc(TopoCharge::Sigma));
+    }
+
+    #[test]
+    fn test_apply_fusion() {
+        
+    }
+}
