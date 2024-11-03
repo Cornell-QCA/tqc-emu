@@ -107,8 +107,6 @@ impl Fusion {
 
     /// Applies the fusion rules to two anyons and returns the resulting anyon(s).
     pub fn apply_fusion(&self, anyon_1: CanonicalTC, anyon_2: CanonicalTC) -> CanonicalTC {
-        assert!(anyon_1.len() == 3 && anyon_2.len() == 3);
-
         let add = |a: CanonicalTC, b: CanonicalTC| -> CanonicalTC {
             std::array::from_fn(|i| a[i] + b[i])
         };
@@ -295,6 +293,27 @@ mod tests {
 
     #[test]
     fn test_apply_fusion() {
-        
+        let example_fusion: Fusion = Fusion::new(State::new());
+        let anyon_1: CanonicalTC = [1, 0, 0]; // psi
+        let anyon_2: CanonicalTC = [0, 0, 1]; // sigma
+        let fusion_product: CanonicalTC = [0, 0, 1]; // sigma
+        assert_eq!(example_fusion.apply_fusion(anyon_1, anyon_2), fusion_product);
+
+        let anyon_1: CanonicalTC = [0, 0, 1]; // sigma
+        let anyon_2: CanonicalTC = [0, 0, 1]; // sigma
+        let fusion_product: CanonicalTC = [1, 1, 0]; // psi + sigma
+        assert_eq!(example_fusion.apply_fusion(anyon_1, anyon_2), fusion_product);
+
+        let anyon_1: CanonicalTC = [4, 3, 1]; // 4 psi + 3 vacuum + 1 sigma
+        let anyon_2: CanonicalTC = [2, 5, 2]; // 2 psi + 5 vacuum + 2 sigma 
+        let fusion_product: CanonicalTC = [28, 25, 21]; // 28 psi + 25 vacuum + 21 sigma 
+        assert_eq!(example_fusion.apply_fusion(anyon_1, anyon_2), fusion_product);
     }
+
+    #[test]
+    fn test_qubit_enc() {
+
+    }
+
+    
 }
