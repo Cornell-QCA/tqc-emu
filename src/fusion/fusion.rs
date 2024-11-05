@@ -1,7 +1,8 @@
-use std::collections::HashMap;
-use pyo3::prelude::*;
 use crate::util::anyon::TopoCharge;
+use crate::util::error::Error;
 use crate::util::state::State;
+use pyo3::prelude::*;
+use std::collections::HashMap;
 
 /// We represent an anyon's topological charge as a triple of usizes. The values
 /// serve as the combinatoric labels for the various states.
@@ -61,7 +62,7 @@ impl Fusion {
     /// Creates a qubit encoding for the Ising model from the fusion tree. The encoding is a list of
     /// FusionPairs that represent the anyons that are fused to create the qubit
     /// encoding.
-    pub fn qubit_enc(&self) -> FusionEvent {
+    pub fn qubit_enc(&self) -> Result<FusionEvent, Error> {
         let mut tcs: Vec<CanonicalTC> = self
             .state
             .anyons()
@@ -92,7 +93,9 @@ impl Fusion {
                 || (final_tc[TopoCharge::Psi.value()] == 1
                     && final_tc[TopoCharge::Vacuum.value()] == 0))
         {
-            return Vec::new();
+            return Err(Error::FusionError(
+                "Final topological charge is not a valid qubit encoding".to_string(),
+            ));
         }
 
         let mut encoding_fusions: FusionEvent = fusion_pair_tc
@@ -102,7 +105,7 @@ impl Fusion {
             .collect();
         encoding_fusions.sort();
         encoding_fusions.pop().unwrap();
-        encoding_fusions
+        Ok(encoding_fusions)
     }
 
     /// Applies the fusion rules to two anyons and returns the resulting anyon(s).
@@ -271,11 +274,13 @@ impl Fusion {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::state::State;
 
     #[test]
     fn test_fusion_pair() {
-        let pair1: FusionPair = FusionPair { anyon_1: 1, anyon_2: 2};
+        let pair1: FusionPair = FusionPair {
+            anyon_1: 1,
+            anyon_2: 2,
+        };
         assert_eq!(pair1.anyon_1(), 1);
         assert_eq!(pair1.anyon_2(), 2);
     }
@@ -283,12 +288,18 @@ mod tests {
     #[test]
     fn test_canonical_tc() {
         let example_fusion: Fusion = Fusion::new(State::new());
-        let canonical_psi: CanonicalTC = [1,0,0];
-        let canonical_vacuum: CanonicalTC = [0,1,0];
-        let canonical_sigma: CanonicalTC = [0,0,1];
+        let canonical_psi: CanonicalTC = [1, 0, 0];
+        let canonical_vacuum: CanonicalTC = [0, 1, 0];
+        let canonical_sigma: CanonicalTC = [0, 0, 1];
         assert_eq!(canonical_psi, example_fusion.canonical_tc(TopoCharge::Psi));
-        assert_eq!(canonical_vacuum, example_fusion.canonical_tc(TopoCharge::Vacuum));
-        assert_eq!(canonical_sigma, example_fusion.canonical_tc(TopoCharge::Sigma));
+        assert_eq!(
+            canonical_vacuum,
+            example_fusion.canonical_tc(TopoCharge::Vacuum)
+        );
+        assert_eq!(
+            canonical_sigma,
+            example_fusion.canonical_tc(TopoCharge::Sigma)
+        );
     }
 
     #[test]
@@ -297,23 +308,28 @@ mod tests {
         let anyon_1: CanonicalTC = [1, 0, 0]; // psi
         let anyon_2: CanonicalTC = [0, 0, 1]; // sigma
         let fusion_product: CanonicalTC = [0, 0, 1]; // sigma
-        assert_eq!(example_fusion.apply_fusion(anyon_1, anyon_2), fusion_product);
+        assert_eq!(
+            example_fusion.apply_fusion(anyon_1, anyon_2),
+            fusion_product
+        );
 
         let anyon_1: CanonicalTC = [0, 0, 1]; // sigma
         let anyon_2: CanonicalTC = [0, 0, 1]; // sigma
         let fusion_product: CanonicalTC = [1, 1, 0]; // psi + sigma
-        assert_eq!(example_fusion.apply_fusion(anyon_1, anyon_2), fusion_product);
+        assert_eq!(
+            example_fusion.apply_fusion(anyon_1, anyon_2),
+            fusion_product
+        );
 
         let anyon_1: CanonicalTC = [4, 3, 1]; // 4 psi + 3 vacuum + 1 sigma
-        let anyon_2: CanonicalTC = [2, 5, 2]; // 2 psi + 5 vacuum + 2 sigma 
-        let fusion_product: CanonicalTC = [28, 25, 21]; // 28 psi + 25 vacuum + 21 sigma 
-        assert_eq!(example_fusion.apply_fusion(anyon_1, anyon_2), fusion_product);
+        let anyon_2: CanonicalTC = [2, 5, 2]; // 2 psi + 5 vacuum + 2 sigma
+        let fusion_product: CanonicalTC = [28, 25, 21]; // 28 psi + 25 vacuum + 21 sigma
+        assert_eq!(
+            example_fusion.apply_fusion(anyon_1, anyon_2),
+            fusion_product
+        );
     }
 
     #[test]
-    fn test_qubit_enc() {
-
-    }
-
-    
+    fn test_qubit_enc() {}
 }
