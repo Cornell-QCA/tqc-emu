@@ -78,9 +78,26 @@ impl Braid {
     }
 
     // TODO: Write swap_mtx
-    pub fn generate_swap_matrix(self, time: usize, swap_index: usize) {
+    pub fn generate_swap_matrix(self, time: usize, swap_index: usize) -> Result<DMatrix<c64>, Error> {
         self.is_valid_time(time)?;
 
+        let (index_a, index_b) = self.swaps[time - 1][swap_index];
+
+        if index_a >= self.state.anyons().len() || index_b >= self.state.anyons().len() {
+            // TODO: Check why error needed here but not other funcs.
+            return Err(Error::BraidingError(format!("Invalid anyon indices: {}, {}", index_a, index_b)));
+        }
+
+        let swap_matrix = if is_direct_swap(index_a, index_b) {
+            self.fusion.r_mtx().clone()
+        } else {
+            let f_mtx_inv = self.fusion.f_mtx().try_inverse()
+                .ok_or_else(|| Error::BraidingError("Failed to get the inverse of F matrix".to_string()))?;
+
+            f_mtx_inv.clone() * self.fusion.r_mtx() * self.fusion.f_mtx().clone()
+        };
+
+        Ok(swap_matrix)
     }
 
     pub fn generate_unitary(&self, time: usize, swap_index: usize) -> Result<DMatrix<c64>, Error> {
@@ -93,9 +110,9 @@ impl Braid {
         for i in 0..num_qubits {
             if i == swap_qubit_index {
                 swap_matrix = self.generate_swap_matrix(time, swap_index);
-                unitary = math::kronecker(unitary, swap_matrix);
+                unitary = unitary.kronecker(&swap_matrix);
             } else {
-                unitary = math::kronecker(unitary, DMatrix::<c64>::identity(2, 2));
+                unitary = unitary.kronecker(DMatrix::<c64>::identity(2, 2));
             }
         }
 
@@ -114,6 +131,21 @@ impl Braid {
             );
         }
         Ok(())
+    }
+
+    fn is_direct_swap(&self, index_a: usize, index_b: usize) -> bool {
+        let fusion_operations = &self.state.operations;
+
+        for fusion in fusion_operations {
+            if fusion.0 == 1 {
+                let fusion_pair = &fusion.1;
+                if (index_a == fusion_pair.anyon_1() && index_b == fusion_pair.anyon_2()) ||
+                   (index_a == fusion_pair.anyon_2() && index_b == fusion_pair.anyon_1()) {
+                    return true;
+            }
+        }
+    
+        false
     }
 }
 
