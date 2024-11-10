@@ -1,4 +1,4 @@
-use crate::fusion::fusion::Fusion;
+use crate::fusion::fusion::{self, Fusion};
 use crate::util::math::{self, c64};
 use nalgebra::DMatrix;
 use pyo3::prelude::*;
@@ -28,15 +28,15 @@ impl Braid {
 
         for (index_a, index_b) in swaps {
             if (index_a as isize - index_b as isize).abs() != 1 {
-                return Error::BraidingError(format!("Indices {} and {} are not adjacent", index_a, index_b));
+                return Err(Error::BraidingError(format!("Indices {} and {} are not adjacent", index_a, index_b)));
             }
 
             if swapped_indices.contains(&index_a) {
-                return Error::BraidingError(format!("Index {} has already been swapped in this operation", index_a));
+                return Err(Error::BraidingError(format!("Index {} has already been swapped in this operation", index_a)));
             }
 
             if swapped_indices.contains(&index_b) {
-                return Error::BraidingError(format!("Index {} has already been swapped in this operation", index_b));
+                return Err(Error::BraidingError(format!("Index {} has already been swapped in this operation", index_b)));
             }
 
             self.state.swap_anyons(index_a, index_b).map_err(|e| Error::BraidingError(format!("Failed to swap anyons: {}", e)));
@@ -56,13 +56,13 @@ impl Braid {
 
         let swap = &self.swaps[time - 1];
         if swap_index >= swap.len() {
-            return Error::BraidingError(
+            return Err(Error::BraidingError(
                 format!(
                     "Swap index {} is greater than the number of swaps {}",
                     swap_index,
                     swap.len(),
                 )
-            );
+            ));
         }
 
         let (index_a, index_b) = swap[swap_index];
@@ -78,7 +78,7 @@ impl Braid {
     }
 
     // Generates the swap matrix for swapping anyons at a given time.
-    pub fn generate_swap_matrix(self, time: usize, swap_index: usize) -> Result<DMatrix<c64>, Error> {
+    pub fn generate_swap_matrix(&self, time: usize, swap_index: usize) -> Result<DMatrix<c64>, Error> {
         self.is_valid_time(time)?;
 
         let (index_a, index_b) = self.swaps[time - 1][swap_index];
@@ -88,7 +88,7 @@ impl Braid {
             return Err(Error::BraidingError(format!("Invalid anyon indices: {}, {}", index_a, index_b)));
         }
 
-        let swap_matrix = if is_direct_swap(index_a, index_b) {
+        let swap_matrix = if self.is_direct_swap(index_a, index_b) {
             self.fusion.r_mtx().clone()
         } else {
             let f_mtx_inv = self.fusion.f_mtx().try_inverse()
@@ -102,17 +102,17 @@ impl Braid {
 
     // Generates a unitary matrix at a given time with a specified swap operatiion.
     pub fn generate_unitary(&self, time: usize, swap_index: usize) -> Result<DMatrix<c64>, Error> {
-        let qubit_encoding: Vec<FusionPair> = self.fusion.qubit_enc();
+        let qubit_encoding: Vec<fusion::FusionPair> = self.fusion.qubit_enc();
 
         let num_qubits = qubit_encoding.len();
-        let unitary = DMatrix::<c64>::identity(num_qubits, num_qubits);
+        let mut unitary = DMatrix::<c64>::identity(num_qubits, num_qubits);
 
-        let swap_qubit_index = self.swap_to_qubit(time, swap_index);
+        let swap_qubit_index = self.swap_to_qubit(time, swap_index)?.unwrap();
         for i in 0..num_qubits {
             let kronecker_matrix = if i == swap_qubit_index {
-                self.generate_swap_matrix(time, swap_index);
+                self.generate_swap_matrix(time, swap_index)?
             } else {
-                DMatrix::<c64>::identity(2, 2);
+                DMatrix::<c64>::identity(2, 2)
             };
 
             unitary = unitary.kronecker(&kronecker_matrix);
@@ -127,7 +127,7 @@ impl Braid {
             return String::new();
         }
 
-        let num_anyons = self.anyons.len();
+        let num_anyons = self.state.anyons().len();
         let max_time = self.swaps.len();
         let max_rows = max_time * 5;
         let spacing = 4;
@@ -183,13 +183,13 @@ impl Braid {
     // Checks if we have a valid input time given swap length. 
     fn is_valid_time(&self, time: usize) -> Result<(), Error> {
         if time == 0 || time > self.swaps.len() {
-            return Error::BraidingError(
+            return Err(Error::BraidingError(
                 format!(
                     "Time cannot be 0 or greater than the length of the swaps. Inputted time: {}, swaps length: {}",
                     time, 
                     self.swaps.len()
                 )
-            );
+            ));
         }
         Ok(())
     }
@@ -210,21 +210,21 @@ impl Braid {
     
         false
     }
+}
 
-    #[pymethods]
-    impl Braid {
-        #[new]
-        pub fn new(state: State) -> Self {
-            if state.anyons().len() < 3 {
-                panic!("State must have at least 3 anyons to braid");
-            }
+#[pymethods]
+impl Braid {
+    #[new]
+    pub fn new(state: State) -> Self {
+        if state.anyons().len() < 3 {
+            panic!("State must have at least 3 anyons to braid");
+        }
 
-            Braid {
-                state,
-                swaps: Vec::new(),
-                fusion: Fusion(state),
-                braid_mtx: DMatrix::from_element(1, 1, c64::new(0.0, 0.0)),
-            }
+        Braid {
+            state,
+            swaps: Vec::new(),
+            fusion: Fusion(state),
+            braid_mtx: DMatrix::from_element(1, 1, c64::new(0.0, 0.0)),
         }
     }
 }

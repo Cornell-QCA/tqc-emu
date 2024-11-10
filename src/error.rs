@@ -1,4 +1,4 @@
-use std::format;
+use std::fmt;
 
 // Main Error enum for the TQC.
 #[derive(Debug)]
