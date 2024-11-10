@@ -176,7 +176,10 @@ impl Fusion {
     ///
     pub fn possible_sigmas(&self, qubits: u32) -> Vec<u32> {
         vec![2 * qubits + 1, 2 * qubits + 2]
+        //TODO: add a possible_sigmas for the current state
     }
+
+
 }
 
 #[pymethods]
@@ -279,12 +282,16 @@ mod tests {
 
     #[test]
     fn test_fusion_pair() {
-        let pair1: FusionPair = FusionPair {
-            anyon_1: 1,
-            anyon_2: 2,
+        let pair1: FusionPair = FusionPair::new(1, 2);
+        let pair2: FusionPair = FusionPair {
+            anyon_1: 3, 
+            anyon_2: 4,
         };
+        
         assert_eq!(pair1.anyon_1(), 1);
         assert_eq!(pair1.anyon_2(), 2);
+        assert_eq!(pair2.anyon_1(), 3);
+        assert_eq!(pair2.anyon_2(), 4);
     }
 
 
@@ -336,16 +343,16 @@ mod tests {
         );
     }
 
-
+    
     #[test]
-    fn test_full_code() {
+    fn test_full_fusion() {
         // create initial anyons
         // add the anyons to the fusion (beginning of the fusion tree)
         let anyon1: Anyon = Anyon::new(String::from("a1"), TopoCharge::Sigma, (0 as f64, 0 as f64));
         let anyon2: Anyon = Anyon::new(String::from("a2"), TopoCharge::Sigma, (0 as f64, 0 as f64));
         let anyon3: Anyon = Anyon::new(String::from("a3"), TopoCharge::Psi, (0 as f64, 0 as f64));
         let anyon4: Anyon = Anyon::new(String::from("a4"), TopoCharge::Vacuum, (0 as f64, 0 as f64));
-
+        let anyon5: Anyon = Anyon::new(String::from("a5"), TopoCharge::Vacuum, (0 as f64, 0 as f64));
 
         let mut example_state: State = State::new();
 
@@ -354,30 +361,42 @@ mod tests {
         example_state.add_anyon(anyon2);
         example_state.add_anyon(anyon3);
         example_state.add_anyon(anyon4); 
+        example_state.add_anyon(anyon5); 
 
         //make fusion pairs of which anyons will fuse with which anyons
-        let example_pair1: FusionPair = FusionPair {anyon_1: 0, anyon_2: 1};
-        let example_pair2: FusionPair = FusionPair {anyon_1: 0, anyon_2: 2};
-        let example_pair3: FusionPair = FusionPair {anyon_1: 0, anyon_2: 3};
+        let pair_1: FusionPair = FusionPair {anyon_1: 0, anyon_2: 1};
+        let pair_2: FusionPair = FusionPair {anyon_1: 0, anyon_2: 2};
+        let pair_3: FusionPair = FusionPair {anyon_1: 0, anyon_2: 3};
+        let pair_4: FusionPair = FusionPair {anyon_1: 0, anyon_2: 4};
 
         //set those fusions in time by creating fusion nodes for each fusion pair
-        let fusionop1: FusionNode = (1 as u32, example_pair1);
-        let fusionop2: FusionNode = (2 as u32, example_pair2);
-        let fusionop3: FusionNode = (3 as u32, example_pair3);
+        let fusionop1: FusionNode = (1 as u32, pair_1.clone());
+        let fusionop2: FusionNode = (2 as u32, pair_2.clone());
+        let fusionop3: FusionNode = (3 as u32, pair_3.clone());
+        let fusionop4: FusionNode = (4 as u32, pair_4.clone());
 
         //add the fusion nodes to the fusion state
         example_state.add_fusion_op(fusionop1);
         example_state.add_fusion_op(fusionop2);
         example_state.add_fusion_op(fusionop3);
+        example_state.add_fusion_op(fusionop4);
 
         let mut example_fusion: Fusion = Fusion::new(example_state);
 
+        //print the fusion tree
         println!("{:?}", example_fusion.__str__());
 
-        //to do:
-        //test qubit_enc
-        //test verify_fusion_result
-        
+        //final fusion is psi + vacuum; it should not be able to start from a sigma
+        assert!(example_fusion.verify_fusion_result(TopoCharge::Vacuum));
+        assert!(example_fusion.verify_fusion_result(TopoCharge::Psi));
+        assert!(!example_fusion.verify_fusion_result(TopoCharge::Sigma));
+
+        let fusion_pair_vec: Vec<FusionPair> = vec![pair_1, pair_2];
+
+        //check the qubit_enc 
+        for i in 0..fusion_pair_vec.len()-2 {
+            assert_eq!(example_fusion.qubit_enc().unwrap()[i], fusion_pair_vec[i]);
+        }
 
     }
 }
