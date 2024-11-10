@@ -190,7 +190,7 @@ impl FusionPair {
 #[pymethods]
 impl Fusion {
     #[new]
-    fn new(state: State) -> Self {
+    pub fn new(state: State) -> Self {
         let operations = state.fusion_ops();
 
         let mut events: Vec<FusionEvent> = Vec::new();

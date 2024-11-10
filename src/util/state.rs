@@ -1,5 +1,6 @@
 use super::anyon::Anyon;
 use crate::fusion::fusion::FusionPair;
+use crate::util::error::Error;
 use pyo3::prelude::*;
 
 use crate::util::math::c64;
@@ -63,6 +64,15 @@ impl State {
 
     pub fn fusion_ops(&self) -> Vec<FusionNode> {
         self.fusion_ops.clone()
+    }
+
+    pub fn swap_anyons(&mut self, index_a: usize, index_b: usize) -> Result<(), Error> {
+        if index_a >= self.anyons.len() || index_b >= self.anyons.len() {
+            return Err(Error::Other(format!("Swap index out of bounds")));
+        }
+
+        self.anyons.swap(index_a, index_b);   
+        Ok(())
     }
 }
 
