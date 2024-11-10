@@ -1,7 +1,8 @@
-use std::collections::HashMap;
-use pyo3::prelude::*;
 use crate::util::anyon::TopoCharge;
+use crate::util::error::Error;
 use crate::util::state::State;
+use pyo3::prelude::*;
+use std::collections::HashMap;
 
 /// We represent an anyon's topological charge as a triple of usizes. The values
 /// serve as the combinatoric labels for the various states.
@@ -61,7 +62,7 @@ impl Fusion {
     /// Creates a qubit encoding for the Ising model from the fusion tree. The encoding is a list of
     /// FusionPairs that represent the anyons that are fused to create the qubit
     /// encoding.
-    pub fn qubit_enc(&self) -> FusionEvent {
+    pub fn qubit_enc(&self) -> Result<FusionEvent, Error> {
         let mut tcs: Vec<CanonicalTC> = self
             .state
             .anyons()
@@ -70,15 +71,11 @@ impl Fusion {
             .collect();
         let mut fusion_pair_tc: HashMap<FusionPair, CanonicalTC> = HashMap::new();
 
-        let mut final_tc: CanonicalTC = [0; 3];
+        let final_tc: CanonicalTC = [0; 3];
 
-        for (i, event) in self.events.iter().enumerate() {
-            for (j, fusion_pair) in event.iter().enumerate() {
+        for  event in self.events.iter() {
+            for fusion_pair in event.iter() {
                 let tc = self.apply_fusion(tcs[fusion_pair.anyon_1()], tcs[fusion_pair.anyon_2()]);
-                if i == self.events.len() - 1 && j == event.len() - 1 {
-                    final_tc = tc;
-                    break;
-                }
                 fusion_pair_tc.insert(fusion_pair.clone(), tc);
                 tcs[fusion_pair.anyon_1()] = tc;
             }
@@ -92,7 +89,9 @@ impl Fusion {
                 || (final_tc[TopoCharge::Psi.value()] == 1
                     && final_tc[TopoCharge::Vacuum.value()] == 0))
         {
-            return Vec::new();
+            return Err(Error::FusionError(
+                "Final topological charge is not a valid qubit encoding".to_string(),
+            ));
         }
 
         let mut encoding_fusions: FusionEvent = fusion_pair_tc
@@ -101,14 +100,11 @@ impl Fusion {
             .map(|(fusion_pair, _)| fusion_pair)
             .collect();
         encoding_fusions.sort();
-        encoding_fusions.pop().unwrap();
-        encoding_fusions
+        Ok(encoding_fusions)
     }
 
     /// Applies the fusion rules to two anyons and returns the resulting anyon(s).
     pub fn apply_fusion(&self, anyon_1: CanonicalTC, anyon_2: CanonicalTC) -> CanonicalTC {
-        assert!(anyon_1.len() == 3 && anyon_2.len() == 3);
-
         let add = |a: CanonicalTC, b: CanonicalTC| -> CanonicalTC {
             std::array::from_fn(|i| a[i] + b[i])
         };
@@ -175,6 +171,7 @@ impl Fusion {
     ///
     pub fn possible_sigmas(&self, qubits: u32) -> Vec<u32> {
         vec![2 * qubits + 1, 2 * qubits + 2]
+        //TODO: add a possible_sigmas for the current state
     }
 }
 
@@ -267,5 +264,221 @@ impl Fusion {
 
     fn minimum_possible_anyons(&self, qubits: u32) -> PyResult<Vec<u32>> {
         Ok(self.possible_sigmas(qubits))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::{
+        anyon::Anyon,
+        state::{FusionNode, State},
+    };
+
+    #[test]
+    fn test_fusion_pair() {
+        let pair1: FusionPair = FusionPair::new(1, 2);
+        let pair2: FusionPair = FusionPair {
+            anyon_1: 3,
+            anyon_2: 4,
+        };
+
+        assert_eq!(pair1.anyon_1(), 1);
+        assert_eq!(pair1.anyon_2(), 2);
+        assert_eq!(pair2.anyon_1(), 3);
+        assert_eq!(pair2.anyon_2(), 4);
+    }
+
+    #[test]
+    fn test_canonical_tc() {
+        let example_fusion: Fusion = Fusion::new(State::new());
+        let canonical_psi: CanonicalTC = [1, 0, 0];
+        let canonical_vacuum: CanonicalTC = [0, 1, 0];
+        let canonical_sigma: CanonicalTC = [0, 0, 1];
+        assert_eq!(canonical_psi, example_fusion.canonical_tc(TopoCharge::Psi));
+        assert_eq!(
+            canonical_vacuum,
+            example_fusion.canonical_tc(TopoCharge::Vacuum)
+        );
+        assert_eq!(
+            canonical_sigma,
+            example_fusion.canonical_tc(TopoCharge::Sigma)
+        );
+    }
+
+    #[test]
+    fn test_apply_fusion() {
+        let example_fusion: Fusion = Fusion::new(State::new());
+        let anyon_1: CanonicalTC = [1, 0, 0]; // psi
+        let anyon_2: CanonicalTC = [0, 0, 1]; // sigma
+        let fusion_product: CanonicalTC = [0, 0, 1]; // sigma
+        assert_eq!(
+            example_fusion.apply_fusion(anyon_1, anyon_2),
+            fusion_product
+        );
+
+        let anyon_1: CanonicalTC = [0, 0, 1]; // sigma
+        let anyon_2: CanonicalTC = [0, 0, 1]; // sigma
+        let fusion_product: CanonicalTC = [1, 1, 0]; // psi + sigma
+        assert_eq!(
+            example_fusion.apply_fusion(anyon_1, anyon_2),
+            fusion_product
+        );
+
+        let anyon_1: CanonicalTC = [4, 3, 1]; // 4 psi + 3 vacuum + 1 sigma
+        let anyon_2: CanonicalTC = [2, 5, 2]; // 2 psi + 5 vacuum + 2 sigma
+        let fusion_product: CanonicalTC = [28, 25, 21]; // 28 psi + 25 vacuum + 21 sigma
+        assert_eq!(
+            example_fusion.apply_fusion(anyon_1, anyon_2),
+            fusion_product
+        );
+    }
+
+    #[test]
+    fn test_full_fusion() {
+        // create initial anyons
+        // add the anyons to the fusion (beginning of the fusion tree)
+        let anyon1: Anyon = Anyon::new(String::from("a1"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyon2: Anyon = Anyon::new(String::from("a2"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyon3: Anyon = Anyon::new(String::from("a3"), TopoCharge::Psi, (0 as f64, 0 as f64));
+        let anyon4: Anyon =
+            Anyon::new(String::from("a4"), TopoCharge::Vacuum, (0 as f64, 0 as f64));
+        let anyon5: Anyon =
+            Anyon::new(String::from("a5"), TopoCharge::Vacuum, (0 as f64, 0 as f64));
+
+        let mut example_state: State = State::new();
+
+        //add anyons to the state
+        example_state.add_anyon(anyon1);
+        example_state.add_anyon(anyon2);
+        example_state.add_anyon(anyon3);
+        example_state.add_anyon(anyon4);
+        example_state.add_anyon(anyon5);
+
+        //make fusion pairs of which anyons will fuse with which anyons
+        let pair_1: FusionPair = FusionPair {
+            anyon_1: 0,
+            anyon_2: 1,
+        };
+        let pair_2: FusionPair = FusionPair {
+            anyon_1: 0,
+            anyon_2: 2,
+        };
+        let pair_3: FusionPair = FusionPair {
+            anyon_1: 0,
+            anyon_2: 3,
+        };
+        let pair_4: FusionPair = FusionPair {
+            anyon_1: 0,
+            anyon_2: 4,
+        };
+
+        //set those fusions in time by creating fusion nodes for each fusion pair
+        let fusionop1: FusionNode = (1 as u32, pair_1.clone());
+        let fusionop2: FusionNode = (2 as u32, pair_2.clone());
+        let fusionop3: FusionNode = (3 as u32, pair_3.clone());
+        let fusionop4: FusionNode = (4 as u32, pair_4.clone());
+
+        //add the fusion nodes to the fusion state
+        example_state.add_fusion_op(fusionop1);
+        example_state.add_fusion_op(fusionop2);
+        example_state.add_fusion_op(fusionop3);
+        example_state.add_fusion_op(fusionop4);
+
+        let mut example_fusion: Fusion = Fusion::new(example_state);
+
+        //print the fusion tree
+        println!("{}", example_fusion.__str__().unwrap());
+
+        //final fusion is psi + vacuum; it should not be able to start from a sigma
+        assert!(example_fusion.verify_fusion_result(TopoCharge::Vacuum));
+        assert!(example_fusion.verify_fusion_result(TopoCharge::Psi));
+        assert!(!example_fusion.verify_fusion_result(TopoCharge::Sigma));
+
+        let fusion_pair_vec: Vec<FusionPair> = vec![pair_1, pair_2];
+
+        //check the qubit_enc
+        for i in 0..fusion_pair_vec.len() - 2 {
+            assert_eq!(example_fusion.qubit_enc().unwrap()[i], fusion_pair_vec[i]);
+        }
+    }
+
+    #[test]
+    fn test_qubit_enc() {
+        let anyon1 = Anyon::new(String::from("a"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyon2 = Anyon::new(String::from("b"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyon3 = Anyon::new(String::from("c"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyon4 = Anyon::new(String::from("d"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyon5 = Anyon::new(String::from("e"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyon6 = Anyon::new(String::from("f"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyons = vec![anyon1, anyon2, anyon3, anyon4, anyon5, anyon6];
+
+        let mut state: State = State::new();
+
+        for anyon in anyons.clone() {
+            state.add_anyon(anyon);
+        }
+
+        let pairs = vec![
+            (
+                1,
+                FusionPair {
+                    anyon_1: 0,
+                    anyon_2: 1,
+                },
+            ),
+            (
+                2,
+                FusionPair {
+                    anyon_1: 0,
+                    anyon_2: 2,
+                },
+            ),
+            (
+                3,
+                FusionPair {
+                    anyon_1: 0,
+                    anyon_2: 3,
+                },
+            ),
+            (
+                4,
+                FusionPair {
+                    anyon_1: 0,
+                    anyon_2: 4,
+                },
+            ),
+            (
+                5,
+                FusionPair {
+                    anyon_1: 0,
+                    anyon_2: 5,
+                },
+            ),
+        ];
+        for pair in pairs {
+            state.add_fusion_op(pair);
+        }
+
+        let fusion = Fusion::new(state);
+
+        println!("{}", fusion.__str__().unwrap());
+
+        let correct = vec![
+            FusionPair {
+                anyon_1: 0,
+                anyon_2: 1,
+            },
+            FusionPair {
+                anyon_1: 0,
+                anyon_2: 3,
+            },
+            FusionPair {
+                anyon_1: 0,
+                anyon_2: 5,
+            },
+        ];
+
+        assert_eq!(fusion.qubit_enc().unwrap(), correct);
     }
 }
