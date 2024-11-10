@@ -221,9 +221,9 @@ impl Braid {
         }
 
         Braid {
-            state,
+            state: state.clone(),
             swaps: Vec::new(),
-            fusion: Fusion(state),
+            fusion: Fusion::new(state),
             braid_mtx: DMatrix::from_element(1, 1, c64::new(0.0, 0.0)),
         }
     }
