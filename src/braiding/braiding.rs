@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use std::collections::HashSet;
 
 use crate::util::state::State;
-use crate::error::Error;
+use crate::util::error::Error;
 
 /// A braid is a sequence of swaps that can be applied to a state. A sequence of
 /// braids is analogous to a gate in a quantum circuit for TQC.
@@ -67,6 +67,7 @@ impl Braid {
 
         let (index_a, index_b) = swap[swap_index];
 
+        // Needs to be adjusted for new qubit_enc().
         Ok(self.fusion.qubit_enc().iter().enumerate().find_map(|(qubit_index, fusion_pair)| {
             if (index_a == fusion_pair.anyon_1() && index_b == fusion_pair.anyon_2()) ||
                 (index_a == fusion_pair.anyon_2() && index_b == fusion_pair.anyon_1()) {
@@ -84,7 +85,6 @@ impl Braid {
         let (index_a, index_b) = self.swaps[time - 1][swap_index];
 
         if index_a >= self.state.anyons().len() || index_b >= self.state.anyons().len() {
-            // TODO: Check why error needed here but not other funcs.
             return Err(Error::BraidingError(format!("Invalid anyon indices: {}, {}", index_a, index_b)));
         }
 
@@ -102,7 +102,7 @@ impl Braid {
 
     // Generates a unitary matrix at a given time with a specified swap operatiion.
     pub fn generate_unitary(&self, time: usize, swap_index: usize) -> Result<DMatrix<c64>, Error> {
-        let qubit_encoding: Vec<fusion::FusionPair> = self.fusion.qubit_enc();
+        let qubit_encoding: Vec<fusion::FusionPair> = self.fusion.qubit_enc()?;
 
         let num_qubits = qubit_encoding.len();
         let mut unitary = DMatrix::<c64>::identity(num_qubits, num_qubits);

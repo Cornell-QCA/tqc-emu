@@ -1,6 +1,6 @@
 use super::anyon::Anyon;
 use crate::fusion::fusion::FusionPair;
-use crate::error::Error;
+use crate::util::error::Error;
 use pyo3::prelude::*;
 
 use crate::util::math::c64;
