@@ -77,7 +77,7 @@ impl Braid {
         }))
     }
 
-    // TODO: Write swap_mtx
+    // Generates the swap matrix for swapping anyons at a given time.
     pub fn generate_swap_matrix(self, time: usize, swap_index: usize) -> Result<DMatrix<c64>, Error> {
         self.is_valid_time(time)?;
 
@@ -100,6 +100,7 @@ impl Braid {
         Ok(swap_matrix)
     }
 
+    // Generates a unitary matrix at a given time with a specified swap operatiion.
     pub fn generate_unitary(&self, time: usize, swap_index: usize) -> Result<DMatrix<c64>, Error> {
         let qubit_encoding: Vec<FusionPair> = self.fusion.qubit_enc();
 
@@ -108,18 +109,78 @@ impl Braid {
 
         let swap_qubit_index = self.swap_to_qubit(time, swap_index);
         for i in 0..num_qubits {
-            if i == swap_qubit_index {
-                swap_matrix = self.generate_swap_matrix(time, swap_index);
-                unitary = unitary.kronecker(&swap_matrix);
+            let kronecker_matrix = if i == swap_qubit_index {
+                self.generate_swap_matrix(time, swap_index);
             } else {
-                unitary = unitary.kronecker(DMatrix::<c64>::identity(2, 2));
-            }
+                DMatrix::<c64>::identity(2, 2);
+            };
+
+            unitary = unitary.kronecker(&kronecker_matrix);
         }
 
         Ok(unitary)
     }
 
-    // TODO: Write str
+    pub fn to_string(&self) -> String {
+        if self.swaps.is_empty() {
+            println!("No swaps to print");
+            return String::new();
+        }
+
+        let num_anyons = self.anyons.len();
+        let max_time = self.swaps.len();
+        let max_rows = max_time * 5;
+        let spacing = 4;
+        let output_width = num_anyons * spacing + 4;
+        let mut output = vec![vec![' '; output_width]; max_rows];
+
+        for time_step in 1..=max_time {
+            let base = (time_step - 1) * 5;
+
+            // Add '|' for non-swap columns
+            for col in 0..num_anyons {
+                // Check if the column is not involved in any swap at the current time step
+                if !self.swaps[time_step - 1].iter().any(|&(a, b)| a == col || b == col) {
+                    for i in 0..5 {
+                        output[base + i][col * spacing + 4] = '|';
+                    }
+                }
+            }
+
+            // Iterate through each swap operation at the current time step
+            for &(index_a, index_b) in &self.swaps[time_step - 1] {
+                if index_a < index_b {
+                    for i in 0..3 {
+                        output[base + i][index_a * spacing + 4 + i] = '\\';
+                        output[base + i][index_b * spacing + 4 - i] = '/';
+                    }
+                    for i in 3..5 {
+                        output[base + i][index_a * spacing + 4 + (5 - i - 1)] = '/';
+                        output[base + i][index_b * spacing + 4 - (5 - i - 1)] = '\\';
+                    }
+                    output[base + 2][index_a * spacing + 4 + 2] = '\\';
+                } else {
+                    for i in 0..3 {
+                        output[base + i][index_b * spacing + 4 + i] = '\\';
+                        output[base + i][index_a * spacing + 4 - i] = '/';
+                    }
+                    for i in 3..5 {
+                        output[base + i][index_b * spacing + 4 + (5 - i - 1)] = '/';
+                        output[base + i][index_a * spacing + 4 - (5 - i - 1)] = '\\';
+                    }
+                }
+            }
+        }
+
+        output
+            .iter()
+            .filter(|row| row.iter().any(|&c| c != ' '))
+            .map(|row| row.iter().collect::<String>())
+            .collect::<Vec<String>>()
+            .join("\n")
+    }
+
+    // Checks if we have a valid input time given swap length. 
     fn is_valid_time(&self, time: usize) -> Result<(), Error> {
         if time == 0 || time > self.swaps.len() {
             return Error::BraidingError(
@@ -133,8 +194,9 @@ impl Braid {
         Ok(())
     }
 
+    // Checks if two anyons at indecies index_a and index_b have a fusion operation at time 1.
     fn is_direct_swap(&self, index_a: usize, index_b: usize) -> bool {
-        let fusion_operations = &self.state.operations;
+        let fusion_operations = &self.state.fusion_ops();
 
         for fusion in fusion_operations {
             if fusion.0 == 1 {
@@ -142,26 +204,27 @@ impl Braid {
                 if (index_a == fusion_pair.anyon_1() && index_b == fusion_pair.anyon_2()) ||
                    (index_a == fusion_pair.anyon_2() && index_b == fusion_pair.anyon_1()) {
                     return true;
+                }
             }
         }
     
         false
     }
-}
 
-#[pymethods]
-impl Braid {
-    #[new]
-    pub fn new(state: State) -> Self {
-        if state.anyons().len() < 3 {
-            panic!("State must have at least 3 anyons to braid");
-        }
+    #[pymethods]
+    impl Braid {
+        #[new]
+        pub fn new(state: State) -> Self {
+            if state.anyons().len() < 3 {
+                panic!("State must have at least 3 anyons to braid");
+            }
 
-        Braid {
-            state,
-            swaps: Vec::new(),
-            fusion: Fusion(state),
-            braid_mtx: DMatrix::from_element(1, 1, c64::new(0.0, 0.0)),
+            Braid {
+                state,
+                swaps: Vec::new(),
+                fusion: Fusion(state),
+                braid_mtx: DMatrix::from_element(1, 1, c64::new(0.0, 0.0)),
+            }
         }
     }
 }
