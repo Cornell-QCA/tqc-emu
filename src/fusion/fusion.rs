@@ -274,6 +274,8 @@ impl Fusion {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::{anyon::Anyon, state::{State, FusionNode}};
+
 
     #[test]
     fn test_fusion_pair() {
@@ -284,6 +286,7 @@ mod tests {
         assert_eq!(pair1.anyon_1(), 1);
         assert_eq!(pair1.anyon_2(), 2);
     }
+
 
     #[test]
     fn test_canonical_tc() {
@@ -302,6 +305,7 @@ mod tests {
         );
     }
 
+
     #[test]
     fn test_apply_fusion() {
         let example_fusion: Fusion = Fusion::new(State::new());
@@ -313,6 +317,7 @@ mod tests {
             fusion_product
         );
 
+
         let anyon_1: CanonicalTC = [0, 0, 1]; // sigma
         let anyon_2: CanonicalTC = [0, 0, 1]; // sigma
         let fusion_product: CanonicalTC = [1, 1, 0]; // psi + sigma
@@ -320,6 +325,7 @@ mod tests {
             example_fusion.apply_fusion(anyon_1, anyon_2),
             fusion_product
         );
+
 
         let anyon_1: CanonicalTC = [4, 3, 1]; // 4 psi + 3 vacuum + 1 sigma
         let anyon_2: CanonicalTC = [2, 5, 2]; // 2 psi + 5 vacuum + 2 sigma
@@ -330,6 +336,48 @@ mod tests {
         );
     }
 
+
     #[test]
-    fn test_qubit_enc() {}
+    fn test_full_code() {
+        // create initial anyons
+        // add the anyons to the fusion (beginning of the fusion tree)
+        let anyon1: Anyon = Anyon::new(String::from("a1"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyon2: Anyon = Anyon::new(String::from("a2"), TopoCharge::Sigma, (0 as f64, 0 as f64));
+        let anyon3: Anyon = Anyon::new(String::from("a3"), TopoCharge::Psi, (0 as f64, 0 as f64));
+        let anyon4: Anyon = Anyon::new(String::from("a4"), TopoCharge::Vacuum, (0 as f64, 0 as f64));
+
+
+        let mut example_state: State = State::new();
+
+        //add anyons to the state
+        example_state.add_anyon(anyon1);
+        example_state.add_anyon(anyon2);
+        example_state.add_anyon(anyon3);
+        example_state.add_anyon(anyon4); 
+
+        //make fusion pairs of which anyons will fuse with which anyons
+        let example_pair1: FusionPair = FusionPair {anyon_1: 0, anyon_2: 1};
+        let example_pair2: FusionPair = FusionPair {anyon_1: 0, anyon_2: 2};
+        let example_pair3: FusionPair = FusionPair {anyon_1: 0, anyon_2: 3};
+
+        //set those fusions in time by creating fusion nodes for each fusion pair
+        let fusionop1: FusionNode = (1 as u32, example_pair1);
+        let fusionop2: FusionNode = (2 as u32, example_pair2);
+        let fusionop3: FusionNode = (3 as u32, example_pair3);
+
+        //add the fusion nodes to the fusion state
+        example_state.add_fusion_op(fusionop1);
+        example_state.add_fusion_op(fusionop2);
+        example_state.add_fusion_op(fusionop3);
+
+        let mut example_fusion: Fusion = Fusion::new(example_state);
+
+        println!("{:?}", example_fusion.__str__());
+
+        //to do:
+        //test qubit_enc
+        //test verify_fusion_result
+        
+
+    }
 }

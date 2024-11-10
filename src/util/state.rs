@@ -28,6 +28,8 @@ pub struct State {
     anyons: Vec<Anyon>,
     #[pyo3(get)]
     fusion_ops: Vec<FusionNode>,
+    //TODO: Add setter method for fusion_ops
+
     // TODO: Add braiding
     // #[pyo3(get)]
     // braiding_ops: Vec<FusionNode>,
@@ -80,6 +82,14 @@ impl State {
         self.anyons.push(anyon);
         Ok(true)
     }
+
+    /// Add a fusion operation to the state
+    pub fn add_fusion_op(&mut self, node: FusionNode) -> PyResult<bool> {
+        self.fusion_ops.push(node);
+        Ok(true)
+    }
+
+    
 
     // TODO: Add braiding
 
