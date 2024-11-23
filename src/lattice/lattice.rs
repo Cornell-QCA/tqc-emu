@@ -13,6 +13,17 @@ enum Cardinal {
     West,
 }
 
+enum Direction {
+    North,
+    NorthEast,
+    East,
+    SouthEast,
+    South,
+    SouthWest,
+    West,
+    NorthWest,
+}
+
 // TODO: can the addresses be smaller values?
 struct Qubit {
     location: Location,
@@ -69,7 +80,7 @@ impl LatticeTimeStep {
 
                     // Qubit 
                     _ => Qubit {
-                        location: Location { x, y },
+                        location: Location {x, y},
                         bit: false,
                         spin: false,
                     },
@@ -82,18 +93,18 @@ impl LatticeTimeStep {
         let new_location: Location = match &direction {
             Cardinal::North => Location { 
                 x: processor.x, 
-                y: processor.y + 1 % self.size, 
+                y: (processor.y + 1) % self.size, 
             },
             Cardinal::East => Location { 
-                x: processor.x + 1 % self.size, 
+                x: (processor.x + 1) % self.size, 
                 y: processor.y,
             },
             Cardinal::South => Location { 
                 x: processor.x, 
-                y: processor.y - 1 % self.size,
+                y: (processor.y - 1) % self.size,
             },
             Cardinal::West => Location { 
-                x: processor.x - 1 % self.size, 
+                x: (processor.x - 1) % self.size, 
                 y: processor.y,
             },
         };
@@ -121,6 +132,46 @@ impl LatticeTimeStep {
                 .map(|direction| self.getAdjacentQubit(direction, processor).spin ^= true),
         };
     }
+    
+    // gets the adjacent processor to another processor in a specified cardinal or ordinal
+    // direction
+    fn getAdjacentProcessor(&self, direction: Direction, processor: Processor) -> Processor {
+        let new_location: Location = match &direction {
+            Direction::North => Location { 
+                x: processor.x, 
+                y: (processor.y + 2) % self.size  
+            },
+            Direction::NorthEast => Location {
+                x: (processor.x + 2) % self.size,
+                y: (processor.y + 2) % self.size
+            },
+            Direction::East => Location {
+                x: (processor.x + 2) % self.size,
+                y: processor.y
+            },
+            Direction::SouthEast => Location {
+                x: (processor.x + 2) % self.size,
+                y: (processor.y - 2) % self.size
+            },
+            Direction::South => Location {
+                x: processor.x,
+                y: (processor.y - 2) % self.size
+            },
+            Direction::SouthWest => Location {
+                x: (processor.x - 2) % self.size,
+                y: (processor.y - 2) % self.size
+            },
+            Direction::West => Location {
+                x: (processor.x - 2) % self.size,
+                y: processor.y
+            },
+            Direction::NorthWest => Location {
+                x: (processor.x - 2) % self.size,
+                y: (processor.y + 2) % self.size
+            },
+        };    
+        return self.processors.get(new_location);
+    } 
 }
 
 pub struct Lattice { // NOTE: the lattice is now incremented by integers to not have floating point
