@@ -1,46 +1,73 @@
-use lattices::{map_union::MapUnion, VecUnion};
+use std::collections::HashMap;
 
 
-enum QubitState {
-    Temporary,
-    // TODO: determine varients
-    //      1
-    //      0
-    //      error?
+enum ProcessorType {
+    Bit,
+    Spin,
 }
 
 // TODO: can the addresses be smaller values?
 struct Qubit {
     location: Location,
-    state: QubitState,
+    bit: bool,
+    spin: bool,
 } 
 
 struct Location {
     x: f32, 
     y: f32,
 }
-
-enum Address {
-    Vertex(Location), // one of these is at integer indeces and the other is at half integer
-    Plaquette(Location),
-}
-
-
 // age is in ToricCode
 // the values for neighboring processors/cells will be grabbed in the methods so there is not redundant data 
-struct Processor<Varient> {
-    address: Address::Varient,
+struct Processor {
+    address: Location,
+    processor_type: ProcessorType, 
     syndrome: u32,
     count: Vec<u32>, // history of syndromes
     flipsignal: bool,
 }
 
+
 pub struct LatticeTimeStep {
-    spin_qubits: MapUnion<Location, QubitState>,
-    bit_flip_processors: MapUnion<Location, Processor<Vertex>>, // TODO: THESE MAY NEED TO BE SWITCHED (vertex/plaquette)
-    phase_processors: MapUnion<Location, Processor<Plaquette>>,
+    qubits: HashMap<Location, Qubit>,
+    processors: HashMap<Location, Processor>, 
+    // Bit processors are at integer indeces; spin/phase
+    // processors are at half-integer indeces
     time: u32, // current time (age)
     size: usize, // same as ToricCode
+}
+
+impl LatticeTimeStep {
+    fn compute_syndrome(&self, processor: Processor) -> u32 { 
+        // given the structure of the
+        // lattice, this method is invarient to the type of processor
+
+        // syndrome is the sum of the values of the respective values of the four surrounding
+        // qubits 
+        let syndrome: u32 = 0;
+        let location: Location = processor.address;
+
+        syndrome += self.qubits.get(location.x, location.y + 0.5).syndrome;
+        syndrome += self.qubits.get(location.x, location.y - 0.5).syndrome;
+        syndrome += self.qubits.get(location.x + 0.5, location.y).syndrome;
+        syndrome += self.qubits.get(location.x - 0.5, location.y).syndrome;
+        return syndrome;
+    }
+
+    fn flip_syndrome(&self, processor: Processor) -> () {
+        if processor.processor_type == Bit {
+            self.qubits.get(location.x, location.y + 0.5).bit ^= true;
+            self.qubits.get(location.x, location.y - 0.5).bit ^= true;
+            self.qubits.get(location.x + 0.5, location.y).bit ^= true;
+            self.qubits.get(location.x - 0.5, location.y).bit ^= true;
+        }
+        if processor.processor_type == Spin {
+            self.qubits.get(location.x, location.y + 0.5).spin ^= true;
+            self.qubits.get(location.x, location.y - 0.5).spin ^= true;
+            self.qubits.get(location.x + 0.5, location.y).spin ^= true;
+            self.qubits.get(location.x - 0.5, location.y).spin ^= true;
+        }
+    }
 }
 
 pub struct Lattice {
