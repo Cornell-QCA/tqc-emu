@@ -21,8 +21,8 @@ struct Qubit {
 } 
 
 struct Location {
-    x: f32, 
-    y: f32,
+    x: u32, 
+    y: u32,
 }
 // age is in ToricCode
 // the values for neighboring processors/cells will be grabbed in the methods so there is not redundant data 
@@ -41,27 +41,59 @@ pub struct LatticeTimeStep {
     // Bit processors are at integer indeces; spin/phase
     // processors are at half-integer indeces
     time: u32, // current time (age)
-    size: f32, 
+    size: u32, 
 }
 
 impl LatticeTimeStep {
+    fn new() {
+        for y in 0..=size {
+            for x in 0..=size {
+                match (x % 2, y % 2) {
+                    // bit processor
+                    (0, 0) => Processor {
+                        address: Location {x, y},
+                        processor_type: ProcessorType::Bit,
+                        syndrome: 0,
+                        count: Vec::new(),
+                        flipsignal: false,
+                    },
+
+                    // spin processor 
+                    (1, 1) => Processor {
+                        address: Location {x, y},
+                        processor_type: ProcessorType::Spin,
+                        syndrome: 0,
+                        count: Vec::new(),
+                        flipsignal: false,
+                    },
+
+                    // Qubit 
+                    _ => Qubit {
+                        location: Location { x, y },
+                        bit: false,
+                        spin: false,
+                    },
+                }
+            }
+        }
+    }
     // gets the qubit adjacent to a PROCESSOR in the direction specified
     fn getAdjacentQubit(&self, direction: Cardinal, processor: Processor) -> Qubit {
         let new_location: Location = match &direction {
             Cardinal::North => Location { 
                 x: processor.x, 
-                y: processor.y + 0.5 % self.size, 
+                y: processor.y + 1 % self.size, 
             },
             Cardinal::East => Location { 
-                x: processor.x + 0.5 % self.size, 
+                x: processor.x + 1 % self.size, 
                 y: processor.y,
             },
             Cardinal::South => Location { 
                 x: processor.x, 
-                y: processor.y - 0.5 % self.size,
+                y: processor.y - 1 % self.size,
             },
             Cardinal::West => Location { 
-                x: processor.x - 0.5 % self.size, 
+                x: processor.x - 1 % self.size, 
                 y: processor.y,
             },
         };
@@ -91,35 +123,30 @@ impl LatticeTimeStep {
     }
 }
 
-pub struct Lattice {
+pub struct Lattice { // NOTE: the lattice is now incremented by integers to not have floating point
+    // rounding errors
     size: usize, // total size
     total_time_steps: u32, // TODO: may be unnecessary
-    steps: VecUnion<LatticeTimeStep>, // Vector of ToricCodeTimeStep's, each representing the state of the toric code at a point in time
+    steps: Vec<LatticeTimeStep>, // Vector of ToricCodeTimeStep's, each representing the state of the toric code at a point in time
 }
 
 
 impl Lattice {
     pub fn new(qubits: usize) -> Self {
         Lattice {
-            size: qubits * qubits, //qubits must be greater than zero
+            // size is the side length, which is twice the number of qubits minus 1
+            size: 2*qubits - 1, //qubits must be greater than zero 
             total_time_steps: 0,
-            steps: VecUnion::new(),
+            steps: Vec::new(),
             start(),
             
         }
     }
 
     pub fn start() -> () {
-        //make the initial lattice (new lattice_time_step)
-        
-        for y in 0..size {
-            for x in 0..size {
-                //add bit_flip (x,y)
-                //add qubit (x+0.5, y)
-                //add qubit (x, y+0.5)
-                //spin_flip (x+0.5, y+0.5)
-            }
-        }
+         //make the initial lattice 
+        // create a new LatticeTimeStep 
+       
 
         //add to steps
    
