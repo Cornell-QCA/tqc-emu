@@ -6,6 +6,13 @@ enum ProcessorType {
     Spin,
 }
 
+enum Cardinal {
+    North,
+    East,
+    South,
+    West,
+}
+
 // TODO: can the addresses be smaller values?
 struct Qubit {
     location: Location,
@@ -34,39 +41,53 @@ pub struct LatticeTimeStep {
     // Bit processors are at integer indeces; spin/phase
     // processors are at half-integer indeces
     time: u32, // current time (age)
-    size: usize, // same as ToricCode
+    size: f32, 
 }
 
 impl LatticeTimeStep {
-    fn compute_syndrome(&self, processor: Processor) -> u32 { 
-        // given the structure of the
-        // lattice, this method is invarient to the type of processor
+    // gets the qubit adjacent to a PROCESSOR in the direction specified
+    fn getAdjacentQubit(&self, direction: Cardinal, processor: Processor) -> Qubit {
+        let new_location: Location = match &direction {
+            Cardinal::North => Location { 
+                x: processor.x, 
+                y: processor.y + 0.5 % self.size, 
+            },
+            Cardinal::East => Location { 
+                x: processor.x + 0.5 % self.size, 
+                y: processor.y,
+            },
+            Cardinal::South => Location { 
+                x: processor.x, 
+                y: processor.y - 0.5 % self.size,
+            },
+            Cardinal::West => Location { 
+                x: processor.x - 0.5 % self.size, 
+                y: processor.y,
+            },
+        };
+        return self.qubits.get(new_location);
+    }
 
+    fn computeSyndrome(&self, processor: Processor) -> u32 { 
         // syndrome is the sum of the values of the respective values of the four surrounding
         // qubits 
-        let syndrome: u32 = 0;
-        let location: Location = processor.address;
-
-        syndrome += self.qubits.get(location.x, location.y + 0.5).syndrome;
-        syndrome += self.qubits.get(location.x, location.y - 0.5).syndrome;
-        syndrome += self.qubits.get(location.x + 0.5, location.y).syndrome;
-        syndrome += self.qubits.get(location.x - 0.5, location.y).syndrome;
+        let syndrome: u32 = [Cardinal::North, Cardinal::East, Cardinal::South, Cardinal::West]
+            .iter()
+            .map(|direction| self.getAdjacentQubit(direction, processor))
+            .sum();
         return syndrome;
     }
 
-    fn flip_syndrome(&self, processor: Processor) -> () {
-        if processor.processor_type == Bit {
-            self.qubits.get(location.x, location.y + 0.5).bit ^= true;
-            self.qubits.get(location.x, location.y - 0.5).bit ^= true;
-            self.qubits.get(location.x + 0.5, location.y).bit ^= true;
-            self.qubits.get(location.x - 0.5, location.y).bit ^= true;
-        }
-        if processor.processor_type == Spin {
-            self.qubits.get(location.x, location.y + 0.5).spin ^= true;
-            self.qubits.get(location.x, location.y - 0.5).spin ^= true;
-            self.qubits.get(location.x + 0.5, location.y).spin ^= true;
-            self.qubits.get(location.x - 0.5, location.y).spin ^= true;
-        }
+    fn flipSyndrome(&self, processor: Processor) -> () {
+        let cardinals: Vec<Cardinal> = [Cardinal::North, Cardinal::East, Cardinal::South, Cardinal::West];
+        match processor.processor_type {
+            Bit => &cardinals 
+                .iter()
+                .map(|direction| self.getAdjacentQubit(direction, processor).bit ^= true),
+            Spin => &cardinals
+                .iter()
+                .map(|direction| self.getAdjacentQubit(direction, processor).spin ^= true),
+        };
     }
 }
 
