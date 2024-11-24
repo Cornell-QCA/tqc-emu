@@ -48,9 +48,10 @@ struct Processor {
 
 pub struct LatticeTimeStep {
     qubits: HashMap<Location, Qubit>,
-    processors: HashMap<Location, Processor>, 
-    // Bit processors are at integer indeces; spin/phase
-    // processors are at half-integer indeces
+    // qubits are at (odd, even) and (even, odd) indeces 
+    processors: HashMap<Location, Processor>,
+    // Bit processors are at (even, even) indeces; 
+    // spin/phase processors are at (odd,odd) indeces
     time: u32, // current time (age)
     size: u32, 
 }
@@ -89,7 +90,7 @@ impl LatticeTimeStep {
         }
     }
     // gets the qubit adjacent to a PROCESSOR in the direction specified
-    fn getAdjacentQubit(&self, direction: Cardinal, processor: Processor) -> Qubit {
+    fn get_adjacent_qubit(&self, direction: Cardinal, processor: Processor) -> Qubit {
         let new_location: Location = match &direction {
             Cardinal::North => Location { 
                 x: processor.x, 
@@ -111,31 +112,32 @@ impl LatticeTimeStep {
         return self.qubits.get(new_location);
     }
 
-    fn computeSyndrome(&self, processor: Processor) -> u32 { 
+    // TODO: current implementation for compute_syndrome is incorrect.
+    fn compute_syndrome(&self, processor: Processor) -> u32 { 
         // syndrome is the sum of the values of the respective values of the four surrounding
         // qubits 
         let syndrome: u32 = [Cardinal::North, Cardinal::East, Cardinal::South, Cardinal::West]
             .iter()
-            .map(|direction| self.getAdjacentQubit(direction, processor))
+            .map(|direction| self.get_adjacent_qubit(direction, processor))
             .sum();
         return syndrome;
     }
 
-    fn flipSyndrome(&self, processor: Processor) -> () {
+    fn flip_syndrome(&self, processor: Processor) -> () {
         let cardinals: Vec<Cardinal> = [Cardinal::North, Cardinal::East, Cardinal::South, Cardinal::West];
         match processor.processor_type {
             Bit => &cardinals 
                 .iter()
-                .map(|direction| self.getAdjacentQubit(direction, processor).bit ^= true),
+                .map(|direction| self.get_adjacent_qubit(direction, processor).bit ^= true),
             Spin => &cardinals
                 .iter()
-                .map(|direction| self.getAdjacentQubit(direction, processor).spin ^= true),
+                .map(|direction| self.get_adjacent_qubit(direction, processor).spin ^= true),
         };
     }
     
     // gets the adjacent processor to another processor in a specified cardinal or ordinal
     // direction
-    fn getAdjacentProcessor(&self, direction: Direction, processor: Processor) -> Processor {
+    fn get_adjacent_processor(&self, direction: Direction, processor: Processor) -> Processor {
         let new_location: Location = match &direction {
             Direction::North => Location { 
                 x: processor.x, 
@@ -215,4 +217,13 @@ impl Lattice {
 
 }
 
+// TODO: add test cases
+#[cfg(test)]
+mod tests {
+    use super::*;
 
+    // #[test]
+    // fn test_compute_syndrome() {
+    //
+    // }
+}
