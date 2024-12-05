@@ -1,5 +1,10 @@
 use std::collections::HashMap;
+use math::round::floor;
 
+const Q: u32 = 16; // colony size 
+const U: u32 = 400; // work period
+const f_c: f32 = 4/5; // threshold for a cell's count
+const f_n: f32 = 1/5; // threshold for a neighboring cell's count
 
 enum ProcessorType {
     Bit,
@@ -14,6 +19,7 @@ enum Cardinal {
 }
 
 enum Direction {
+    // Center, // regards the implement_flip_syndrome optimization
     North,
     NorthEast,
     East,
@@ -23,6 +29,15 @@ enum Direction {
     West,
     NorthWest,
 }
+
+// regards the implement_flip_syndrome optimization
+// enum Action {
+//     DoNothing,
+//     FlipNorth,
+//     FlipEast,
+//     FlipSouth,
+//     FlipWest,
+// }
 
 // TODO: can the addresses be smaller values?
 struct Qubit {
@@ -40,7 +55,7 @@ struct Location {
 struct Processor {
     address: Location,
     processor_type: ProcessorType, 
-    syndrome: u32,
+    syndrome: bool,
     count: Vec<u32>, // history of syndromes
     flipsignal: bool,
 }
@@ -112,7 +127,7 @@ impl LatticeTimeStep {
         return self.qubits.get(new_location);
     }
 
-    fn compute_syndrome<ProcessorType>(&self, processor: Processor) -> u32 { 
+    fn compute_syndrome<ProcessorType>(&self, processor: Processor) -> bool { 
         // syndrome is the sum of the values of the respective values of the four surrounding
         // qubits 
         let syndrome: u32 = [Cardinal::North, Cardinal::East, Cardinal::South, Cardinal::West]
@@ -122,7 +137,7 @@ impl LatticeTimeStep {
                 ProcessorType::Spin => self.get_adjacent_qubit(direction, processor).spin as u32
             })
             .sum();
-        return syndrome;
+        return syndrome % 2 as bool;
     }
 
     fn flip_syndrome(&self, processor: Processor) -> () {
@@ -141,6 +156,7 @@ impl LatticeTimeStep {
     // direction
     fn get_adjacent_processor(&self, direction: Direction, processor: Processor) -> Processor {
         let new_location: Location = match &direction {
+            Direction::Center => return processor.clone(), 
             Direction::North => Location { 
                 x: processor.x, 
                 y: (processor.y + 2) % self.size  
@@ -176,6 +192,156 @@ impl LatticeTimeStep {
         };    
         return self.processors.get(new_location);
     } 
+
+    // TODO: this would be a cleaner way to implement the rules, 
+    // though it may not work for the non-abelian rules, 
+    // and as such it is not completely
+    // implemented
+    //
+    // fn implement_local_rules(
+    //     &self, 
+    //     new_lattice: LatticeTimeStep,
+    //     directions: vec<Direction>,
+    //     conditions: vec<bool>, 
+    //     actions: vec<Action>
+    // ) -> Result<(), Error> {
+    //     directions
+    //         .zip(conditions)
+    //         .zip(actions)
+    //         .iter()
+    //         .map(|(direction, condition, action)| {
+    //             if self.get_adjacent_processor(direction).syndrome == condition
+    //             // match direction {
+    //             //     Direction::Center => if !self.get_adjacent_processor(direction)
+    //             // }
+    //             // if self.get_adjacent_processor(direction).syndrome {
+    //             //     self.flip_syndrome()
+    //             // }
+    //         });
+    // }
+
+    fn local_rules(&self) -> Result<LatticeTimeStep, Error> { // TODO: implement error
+        let mut new_lattice: LatticeTimeStep = self.clone();
+        // iterate over all processors in self 
+        // do the local rules and do the flips (flip newighboring qubit) in new_lattice 
+        // this needs to be repeated for both spin and bit processors 
+        // "each qubit is only ever controlled by a single processor"
+        
+        // for each processor (of a type)
+        for (location, processor) in self.processors.into_iter() {
+            // processors in the respective directions 
+            let proc_n: Processor = self.get_adjacent_processor(Direction::North);
+            let proc_ne: Processor = self.get_adjacent_processor(Direction::NorthEast);
+            let proc_e: Processor = self.get_adjacent_processor(Direction::East);
+            let proc_se: Processor = self.get_adjacent_processor(Direction::SouthEast);
+            let proc_s: Processor = self.get_adjacent_processor(Direction::South);
+            let proc_sw: Processor = self.get_adjacent_processor(Direction::SouthWest);
+            let proc_w: Processor = self.get_adjacent_processor(Direction::West);
+            let proc_nw: Processor = self.get_adjacent_processor(Direction::NorthWest);
+
+            if location.x % Q == 0 { // W border
+                if !processor.syndrome {continue} // do nothing for this processor
+                else if proc_nw.syndrome {new_lattice.flip_syndrome(proc_w); continue} 
+                else if proc_w.syndrome {new_lattice.flip_syndrome(proc_w); continue} 
+                else if proc_sw.syndrome {new_lattice.flip_syndrome(proc_w); continue}
+            }
+            if location.y % Q == 0 { // S border
+                if !processor.syndrome {continue}
+                else if proc_sw.syndrome {new_lattice.flip_syndrome(proc_s); continue}
+                else if proc_s.syndrome {new_lattice.flip_syndrome(proc_s); continue}
+                else if proc_se.syndrome {new_lattice.flip_syndrome(proc_s); continue}
+            }
+            if location.x % Q < floor(Q/2) && location.y % Q < floor(Q/2) { // SW quadrant
+                if !processor.syndrome {continue}
+                else if proc_s.syndrome {continue}
+                else if proc_w.syndrome {continue}
+                else if proc_n.syndrome {new_lattice.flip_syndrome(proc_n); continue}
+                else if proc_e.syndrome {new_lattice.flip_syndrome(proc_e); continue}
+                else if proc_sw.syndrome { continue}
+                else if proc_nw.syndrome {new_lattice.flip_syndrome(proc_n); continue}
+                else if proc_se.syndrome {new_lattice.flip_syndrome(proc_e); continue}
+                else {new_lattice.flip_syndrome(proc_n); continue} // flip north or east
+            }
+            if location.x % Q < floor(Q/2) && location.y == Q < floor(Q/2) { // W corridor
+                if !processor.syndrome {continue}
+                else if proc_s.syndrome {continue}
+                else if proc_w.syndrome {continue}
+                else if proc_n.syndrome {continue}
+                else if proc_e.syndrome {new_lattice.flip_syndrome(proc_e); continue}
+                else if proc_sw.syndrome { continue}
+                else if proc_nw.syndrome { continue}
+                else {new_lattice.flip_syndrome(proc_e); continue} // flip east
+            }
+            if location.x % Q < floor(Q/2) && location.y % Q > floor(Q/2) { // NW quadrant
+                if !processor.syndrome {continue}
+                else if proc_w.syndrome {continue}
+                else if proc_n.syndrome {continue}
+                else if proc_e.syndrome {new_lattice.flip_syndrome(proc_e); continue}
+                else if proc_s.syndrome {new_lattice.flip_syndrome(proc_s); continue}
+                else if proc_nw.syndrome {continue}
+                else if proc_ne.syndrome {new_lattice.flip_syndrome(proc_e); continue}
+                else if proc_sw.syndrome {new_lattice.flip_syndrome(proc_s); continue}
+                else {new_lattice.flip_syndrome(proc_e); continue} // flip east or south
+            }
+            if location.x % Q == floor(Q/2) && location.y % Q > floor(Q/2) { // N corridor
+                if !processor.syndrome {continue}
+                else if proc_w.syndrome {continue}
+                else if proc_n.syndrome {continue}
+                else if proc_e.syndrome {continue}
+                else if proc_s.syndrome {new_lattice.flip_syndrome(proc_s); continue}
+                else if proc_nw.syndrome {continue}
+                else if proc_ne.syndrome {new_lattice.flip_syndrome(proc_e); continue}
+                else {new_lattice.flip_syndrome(proc_s); continue} // flip south
+            }
+            if location.x % Q > floor(Q/2) && location.y % Q > floor(Q/2) { // NE quadrant
+                if !processor.syndrome {continue}
+                else if proc_n.syndrome {continue}
+                else if proc_e.syndrome {continue}
+                else if proc_s.syndrome {new_lattice.flip_syndrome(proc_s); continue}
+                else if proc_w.syndrome {new_lattice.flip_syndrome(proc_w); continue}
+                else if proc_ne.syndrome {continue}
+                else if proc_se.syndrome {new_lattice.flip_syndrome(proc_s); continue}
+                else if proc_nw.syndrome {new_lattice.flip_syndrome(proc_w); continue}
+                else {new_lattice.flip_syndrome(proc_e); continue} // flip east or south
+            }
+            if location.x % Q > floor(Q/2) && location.y % Q == floor(Q/2) { // E corridor
+                if !processor.syndrome {continue}
+                else if proc_n.syndrome {continue}
+                else if proc_e.syndrome {continue}
+                else if proc_s.syndrome {continue}
+                else if proc_w.syndrome {new_lattice.flip_syndrome(proc_w); continue}
+                else if proc_ne.syndrome {continue}
+                else if proc_se.syndrome {continue}
+                else {new_lattice.flip_syndrome(proc_w); continue} // flip west
+            }
+            if location.x % Q > floor(Q/2) && location.y % Q < floor(Q/2) { // SE quadrant
+                if !processor.syndrome {continue}
+                else if proc_e.syndrome {continue}
+                else if proc_s.syndrome {continue}
+                else if proc_w.syndrome {new_lattice.flip_syndrome(proc_w); continue}
+                else if proc_n.syndrome {new_lattice.flip_syndrome(proc_n); continue}
+                else if proc_se.syndrome {continue}
+                else if proc_sw.syndrome {new_lattice.flip_syndrome(proc_w); continue}
+                else if proc_ne.syndrome {new_lattice.flip_syndrome(proc_n); continue}
+                else {new_lattice.flip_syndrome(proc_w); continue} // flip west or north
+            }
+            if location.x % Q == floor(Q/2) && location.y % Q < floor(Q/2) { // S corridor
+                if !processor.syndrome {continue}
+                else if proc_e.syndrome {continue}
+                else if proc_s.syndrome {continue}
+                else if proc_w.syndrome {continue}
+                else if proc_n.syndrome {new_lattice.flip_syndrome(proc_n); continue}
+                else if proc_se.syndrome {continue}
+                else if proc_sw.syndrome {continue}
+                else {new_lattice.flip_syndrome(proc_n); continue} // flip north
+            }
+            if location.x % Q == floor(Q/2) && location.y % Q == floor(Q/2) { // colony center
+                continue;
+                // if age == 0, execute rules for colony meighbors and update flipsignal
+                // else, do nothing
+            }
+        }
+    }
 }
 
 pub struct Lattice { // NOTE: the lattice is now incremented by integers to not have floating point
