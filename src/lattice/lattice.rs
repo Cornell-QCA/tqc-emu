@@ -112,13 +112,15 @@ impl LatticeTimeStep {
         return self.qubits.get(new_location);
     }
 
-    // TODO: current implementation for compute_syndrome is incorrect.
-    fn compute_syndrome(&self, processor: Processor) -> u32 { 
+    fn compute_syndrome<ProcessorType>(&self, processor: Processor) -> u32 { 
         // syndrome is the sum of the values of the respective values of the four surrounding
         // qubits 
         let syndrome: u32 = [Cardinal::North, Cardinal::East, Cardinal::South, Cardinal::West]
             .iter()
-            .map(|direction| self.get_adjacent_qubit(direction, processor))
+            .map(|direction| match ProcessorType {
+                ProcessorType::Bit => self.get_adjacent_qubit(direction, processor).bit as u32,
+                ProcessorType::Spin => self.get_adjacent_qubit(direction, processor).spin as u32
+            })
             .sum();
         return syndrome;
     }
