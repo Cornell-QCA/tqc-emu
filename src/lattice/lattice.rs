@@ -7,8 +7,8 @@ const f_c: f32 = 4/5; // threshold for a cell's count
 const f_n: f32 = 1/5; // threshold for a neighboring cell's count
 
 enum ProcessorType {
-    Bit,
-    Spin,
+    Bit, // primary lattice
+    Spin, // dual lattice
 }
 
 enum Cardinal {
@@ -28,6 +28,12 @@ enum Direction {
     SouthWest,
     West,
     NorthWest,
+}
+
+// TODO: may need to change the encoding
+enum LogicalQubitType {
+    Vertical,
+    Horizontal,
 }
 
 // regards the implement_flip_syndrome optimization
@@ -69,6 +75,14 @@ pub struct LatticeTimeStep {
     // spin/phase processors are at (odd,odd) indeces
     age: u32, // current time (age)
     size: u32, 
+}
+
+impl Location {
+    fn new(x: u32, y:u32) -> Location {
+        return Location { x, y };
+    }
+
+    // fn get_location_type(&self) -> 
 }
 
 impl LatticeTimeStep {
@@ -145,9 +159,11 @@ impl LatticeTimeStep {
     fn flip_syndrome(&self, processor: Processor) -> () {
         let cardinals: Vec<Cardinal> = [Cardinal::North, Cardinal::East, Cardinal::South, Cardinal::West];
         match processor.processor_type {
+            // X operator
             Bit => &cardinals 
                 .iter()
                 .map(|direction| self.get_adjacent_qubit(direction, processor).bit ^= true),
+            // Z operator
             Spin => &cardinals
                 .iter()
                 .map(|direction| self.get_adjacent_qubit(direction, processor).spin ^= true),
@@ -196,33 +212,33 @@ impl LatticeTimeStep {
     } 
 
     // TODO: this would be a cleaner way to implement the rules, 
-    // though it may not work for the non-abelian rules, 
-    // and as such it is not completely
-    // implemented
-    //
-    // fn implement_local_rules(
-    //     &self, 
-    //     new_lattice: LatticeTimeStep,
-    //     directions: vec<Direction>,
-    //     conditions: vec<bool>, 
-    //     actions: vec<Action>
-    // ) -> Result<(), Error> {
-    //     directions
-    //         .zip(conditions)
-    //         .zip(actions)
-    //         .iter()
-    //         .map(|(direction, condition, action)| {
-    //             if self.get_adjacent_processor(direction).syndrome == condition
-    //             // match direction {
-    //             //     Direction::Center => if !self.get_adjacent_processor(direction)
-    //             // }
-    //             // if self.get_adjacent_processor(direction).syndrome {
-    //             //     self.flip_syndrome()
-    //             // }
-    //         });
-    // }
+    /* though it may not work for the non-abelian rules, 
+    and as such it is not completely
+    implemented
 
-    fn local_rules(&self) -> Result<LatticeTimeStep, Error> { // TODO: implement error
+    fn implement_local_rules(
+        &self, 
+        new_lattice: LatticeTimeStep,
+        directions: vec<Direction>,
+        conditions: vec<bool>, 
+        actions: vec<Action>
+    ) -> Result<(), Error> {
+        directions
+            .zip(conditions)
+            .zip(actions)
+            .iter()
+            .map(|(direction, condition, action)| {
+                if self.get_adjacent_processor(direction).syndrome == condition
+                // match direction {
+                //     Direction::Center => if !self.get_adjacent_processor(direction)
+                // }
+                // if self.get_adjacent_processor(direction).syndrome {
+                //     self.flip_syndrome()
+                // }
+            });
+    } */
+
+    fn local_rules(&self) -> Result<LatticeTimeStep, Error> { // TODO: implement error handling
         let mut new_lattice: LatticeTimeStep = self.clone();
         // iterate over all processors in self 
         // do the local rules and do the flips (flip newighboring qubit) in new_lattice 
@@ -255,7 +271,7 @@ impl LatticeTimeStep {
             }
             else {
                 if location.x % Q < floor(Q/2) && location.y % Q < floor(Q/2) { // SW quadrant
-                 if !processor.syndrome {continue}
+                    if !processor.syndrome {continue}
                     else if proc_s.syndrome {continue}
                     else if proc_w.syndrome {continue}
                     else if proc_n.syndrome {new_lattice.flip_syndrome(proc_n); continue}
@@ -347,7 +363,33 @@ impl LatticeTimeStep {
         }
     }
 
-    fn step(&self) {
+    // Adds a new logical qubit in the orientation (vertical/horizontal) representing two of the
+    // base states on the torus
+    // Whether the logical qubit is on the primary or dual lattice is determined by the specified
+    // processor and its location
+    // TODO: the encoding may be incorrect and/or may need to add the state that has two loops on
+    // the torus, each of different orientation 
+    // NOTE: currently this is just a function for testing the lattice until I learn exactly how the
+    // logical qubits are encoded
+    fn add_logical_qubit<LogicalQubitType>(&self, processor: Processor) -> Result<(), Error> {
+        // add a new loop on the torus
+        match LogicalQubitType {
+            LogicalQubitType::Vertical => { 
+                for y in 0..self.size {
+                    let changed_processor: Processor = self.processors.get(&processor.x, (&processor.y + y) % self.size);
+                    self.flip_syndrome(changed_processor);
+                } 
+            },
+            LogicalQubitType::Horizontal => {
+                for x in 0..self.size {
+                    let changed_processor: Processor = self.processors.get((&processor.x + x) % self.size, &processor.y);
+                    self.flip_syndrome(changed_processor);
+                } 
+            },
+        }
+    }
+
+    fn step(&self) {  
         age += 1 % U;
 
         self = self.local_rules();
@@ -387,7 +429,8 @@ impl Lattice {
         //add new LatticTimeStep to the steps
         total_time_steps += 1;
 
-        let mut new_step: LatticeTimeStep = steps[steps.length-1];
+        let mut new_step: LatticeTimeStep = steps[steps.length-1]; // TODO: does rust have indexing
+    // from the end?
         vec.push(new_step.step()) //add the next lattice time step
 
 
