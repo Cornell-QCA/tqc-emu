@@ -85,6 +85,8 @@ impl Location {
     // fn get_location_type(&self) -> 
 }
 
+// TODO: put each processor and qubit into the respective hashmap
+//       add return type for `new`
 impl LatticeTimeStep {
     fn new(input_size: u32) {
         age = 0;
