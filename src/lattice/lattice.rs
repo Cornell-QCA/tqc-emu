@@ -1,11 +1,6 @@
 use std::collections::HashMap;
 use math::round::floor;
 
-const Q: u32 = 16; // colony size 
-const U: u32 = 400; // work period
-const f_c: f32 = 4/5; // threshold for a cell's count
-const f_n: f32 = 1/5; // threshold for a neighboring cell's count
-
 enum ProcessorType {
     Bit,
     Spin,
@@ -38,7 +33,41 @@ enum Direction {
 //     FlipSouth,
 //     FlipWest,
 // }
+pub struct TotalColony {
+// all colonies and supercolonies (consisting of (NxN)^n lattices)
+}
 
+pub struct Lattice { // NOTE: the lattice is now incremented by integers to not have floating point
+    // rounding errors
+    colony_size: usize, // size (NxN) of a colony, scales exponentially with colony_levels
+    colony_levels: usize, // total amount of levels of super colonies
+    work_time: usize, // perfect square, equal to n times n: n is the amount of intervals in a work period and size of each work period interval
+    total_work_periods: usize, // amount of work periods we want to run
+    f_c: usize, // error threshold for the center cell of a colony
+    f_n: usize, // error threshold for a neighboring cell (not center)
+    
+    steps: Vec<LatticeTimeStep>, // Vector of ToricCodeTimeStep's, each representing the state of the toric code at a point in time
+    intervals: Vec<Interval>, //intervals containing sqrt(work_time) amount of steps
+    work_periods: Vec<WorkPeriod>, //work periods containing sqrt(work_time) amount of intervals
+}
+
+pub struct Interval {
+
+}
+
+pub struct WorkPeriod{
+
+}
+
+pub struct LatticeTimeStep {
+    qubits: HashMap<Location, Qubit>,
+    // qubits are at (odd, even) and (even, odd) indeces 
+    processors: HashMap<Location, Processor>,
+    // Bit processors are at (even, even) indeces; 
+    // spin/phase processors are at (odd,odd) indeces
+    age: u32, // current time (age)
+    size: u32, 
+}
 // TODO: can the addresses be smaller values?
 struct Qubit {
     location: Location,
@@ -60,16 +89,52 @@ struct Processor {
     flipsignal: bool,
 }
 
+impl TotalColony {
 
-pub struct LatticeTimeStep {
-    qubits: HashMap<Location, Qubit>,
-    // qubits are at (odd, even) and (even, odd) indeces 
-    processors: HashMap<Location, Processor>,
-    // Bit processors are at (even, even) indeces; 
-    // spin/phase processors are at (odd,odd) indeces
-    age: u32, // current time (age)
-    size: u32, 
+
 }
+
+
+impl Lattice {
+    pub fn new(size: usize, levels: usize, time: usize, periods: usize, f1: usize, f2: usize) -> Self {
+        Lattice {
+            colony_size: size,
+            colony_levels: levels,
+            work_time: time,
+            total_work_periods: periods,
+            f_c: f1,
+            f_n: f2,
+            steps: Vec::new(),
+            intervals: Vec::new(),
+            work_periods: Vec::new(),
+            start(),
+        }
+    }
+
+    pub fn start() -> () {
+         //make the initial lattice 
+        // create a new LatticeTimeStep 
+       
+
+        //add to steps
+   
+    }
+
+    pub fn increment_time() -> () {
+        //add new LatticTimeStep to the steps
+        total_time_steps += 1;
+
+        let mut new_step: LatticeTimeStep = steps[steps.length-1];
+        vec.push(new_step.step()) //add the next lattice time step
+
+
+    }
+    
+    //TODO: make methods that add a new thing without having to create a new lattice
+    //different types of increment_time?
+
+}
+
 
 impl LatticeTimeStep {
     fn new(input_size: u32) {
@@ -354,49 +419,7 @@ impl LatticeTimeStep {
     }
 }
 
-pub struct Lattice { // NOTE: the lattice is now incremented by integers to not have floating point
-    // rounding errors
-    size: usize, // total size
-    total_time_steps: u32, // TODO: may be unnecessary
-    steps: Vec<LatticeTimeStep>, // Vector of ToricCodeTimeStep's, each representing the state of the toric code at a point in time
-}
 
-
-impl Lattice {
-    pub fn new(qubits: usize) -> Self {
-        Lattice {
-            // size is the side length, which is twice the number of qubits minus 1
-            size: 2*qubits - 1, //qubits must be greater than zero 
-            total_time_steps: 0,
-            steps: Vec::new(),
-            start(),
-            
-        }
-    }
-
-    pub fn start() -> () {
-         //make the initial lattice 
-        // create a new LatticeTimeStep 
-       
-
-        //add to steps
-   
-    }
-
-    pub fn increment_time() -> () {
-        //add new LatticTimeStep to the steps
-        total_time_steps += 1;
-
-        let mut new_step: LatticeTimeStep = steps[steps.length-1];
-        vec.push(new_step.step()) //add the next lattice time step
-
-
-    }
-    
-    //TODO: make methods that add a new thing without having to create a new lattice
-    //different types of increment_time?
-
-}
 
 // TODO: add test cases
 #[cfg(test)]
