@@ -154,35 +154,58 @@ impl Location {
 //       add return type for `new`
 impl LatticeTimeStep {
     fn new(input_size: u32) {
-        age = 0;
-        size = input_size;
+        let age: usize = 0; // TODO: this may need to change
+        let size: usize = input_size;
+        let mut new_lattice: LatticeTimeStep = LatticeTimeStep { 
+            HashMap<Location, Qubit>::new(), 
+            HashMap<Location, Processor>::new(),
+            age,
+            size,
+        };
         for y in 0..=size {
             for x in 0..=size {
                 match (x % 2, y % 2) {
                     // bit processor
-                    (0, 0) => Processor {
-                        address: Location {x, y},
-                        processor_type: ProcessorType::Bit,
-                        syndrome: 0,
-                        count: Vec::new(),
-                        flipsignal: false,
-                    },
+                    (0, 0) => new_lattice.processors.insert(
+                        Location {
+                            x, 
+                            y
+                        }, 
+                        Processor {
+                            address: Location {x, y},
+                            processor_type: ProcessorType::Bit,
+                            syndrome: 0,
+                            count: Vec::new(),
+                            flipsignal: false,
+                        }
+                    ),
 
-                    // spin processor 
-                    (1, 1) => Processor {
-                        address: Location {x, y},
-                        processor_type: ProcessorType::Spin,
-                        syndrome: 0,
-                        count: Vec::new(),
-                        flipsignal: false,
-                    },
+                    // spin processor
+                    (1, 1) => new_lattice.processors.insert(
+                        Location {
+                            x, 
+                            y
+                        }, 
+                        Processor {
+                            address: Location {x, y},
+                            processor_type: ProcessorType::Spin,
+                            syndrome: 0,
+                            count: Vec::new(),
+                            flipsignal: false,
+                        }
+                    ),
 
-                    // Qubit 
-                    _ => Qubit {
-                        location: Location {x, y},
-                        bit: false,
-                        spin: false,
-                    },
+                    _ => new_lattice.qubits.insert(
+                        Location {
+                            x, 
+                            y
+                        }, 
+                        Qubit {
+                            location: Location {x, y},
+                            bit: false,
+                            spin: false,
+                        }
+                    ),
                 }
             }
         }
@@ -458,7 +481,10 @@ impl LatticeTimeStep {
 
     fn step(&self) {  
         age += 1 % U;
-
+        
+        // compute syndromes
+        // apply local rules 
+        // do logical computation (apply logical gates)
         self = self.local_rules();
     }
 }
